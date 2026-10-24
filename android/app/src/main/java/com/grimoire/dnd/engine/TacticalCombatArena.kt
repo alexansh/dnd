@@ -17,6 +17,12 @@ enum class CombatActionType {
     USE_POTION
 }
 
+data class LegalCombatAction(
+    val actionType: CombatActionType,
+    val targetId: String,
+    val description: String
+)
+
 data class Combatant(
     val id: String,
     val name: String,
@@ -26,18 +32,29 @@ data class Combatant(
     val armorClass: Int,
     var currentZone: CombatZone = CombatZone.MELEE_FRONTLINE,
     val speedFeet: Int = 30,
+    var movementRemainingFeet: Int = 30,
     val attackBonus: Int = 4,
     val damageFormula: String = "1d6+2",
     val isSpellcaster: Boolean = false,
     val initiativeBonus: Int = 2,
+    val conModifier: Int = 2,
     var initiativeRoll: Int = 0,
     var isDodgeActive: Boolean = false,
     var hasTakenAction: Boolean = false,
     var hasTakenBonusAction: Boolean = false,
-    var isDowned: Boolean = false
+    var hasTakenReaction: Boolean = false,
+    var isDowned: Boolean = false,
+    val conditions: MutableSet<String> = mutableSetOf(),
+    var activeConcentrationSpell: String? = null
 ) {
     val effectiveAc: Int
         get() = if (currentZone.providesHalfCover) armorClass + 2 else armorClass
+
+    fun canAct(): Boolean {
+        if (isDowned) return false
+        val disablingConditions = setOf("INCAPACITATED", "STUNNED", "PARALYZED", "UNCONSCIOUS", "PETRIFIED")
+        return conditions.none { it.uppercase() in disablingConditions }
+    }
 }
 
 data class CombatLogEntry(
@@ -128,18 +145,48 @@ class TacticalCombatArena(
         return active[currentTurnIndex % active.size]
     }
 
+    fun generateLegalActions(actor: Combatant): List<LegalCombatAction> {
+        if (!actor.canAct() || actor.hasTakenAction) return emptyList()
+
+        val legal = mutableListOf<LegalCombatAction>()
+        val opponents = combatants.filter { it.isPlayerParty != actor.isPlayerParty && !it.isDowned }
+
+        for (target in opponents) {
+            legal.add(LegalCombatAction(CombatActionType.ATTACK_MELEE, target.id, "Melee Attack against ${target.name}"))
+            legal.add(LegalCombatAction(CombatActionType.ATTACK_RANGED, target.id, "Ranged Attack against ${target.name}"))
+            if (actor.isSpellcaster) {
+                legal.add(LegalCombatAction(CombatActionType.CAST_SPELL, target.id, "Cast Offensive Spell at ${target.name}"))
+            }
+        }
+
+        legal.add(LegalCombatAction(CombatActionType.DODGE, actor.id, "Adopt Dodge Stance (impose disadvantage on attackers)"))
+        legal.add(LegalCombatAction(CombatActionType.DISENGAGE, actor.id, "Disengage and reposition"))
+        legal.add(LegalCombatAction(CombatActionType.USE_POTION, actor.id, "Drink Potion of Healing"))
+
+        return legal
+    }
+
     fun executePlayerAction(
         actor: Combatant,
         target: Combatant,
         actionType: CombatActionType
     ): String {
+        if (!actor.canAct()) return "${actor.name} cannot act due to disabling condition (${actor.conditions.joinToString()})."
         if (actor.hasTakenAction) return "${actor.name} has already taken an action this turn."
 
         var outcomeMsg = ""
 
         when (actionType) {
             CombatActionType.ATTACK_MELEE, CombatActionType.ATTACK_RANGED -> {
-                val rollType = if (target.isDodgeActive) RollType.DISADVANTAGE else RollType.NORMAL
+                val hasAdvantage = target.conditions.contains("PRONE") || target.conditions.contains("PARALYZED") || target.conditions.contains("RESTRAINED") || target.conditions.contains("BLINDED")
+                val hasDisadvantage = target.isDodgeActive || actor.conditions.contains("POISONED")
+
+                val rollType = when {
+                    hasAdvantage && !hasDisadvantage -> RollType.ADVANTAGE
+                    hasDisadvantage && !hasAdvantage -> RollType.DISADVANTAGE
+                    else -> RollType.NORMAL
+                }
+
                 val attackRoll = diceEngine.rollD20(actor.attackBonus, rollType)
                 val targetAc = target.effectiveAc
 
@@ -152,6 +199,9 @@ class TacticalCombatArena(
                     val critText = if (attackRoll.isCriticalHit) " [CRITICAL HIT!]" else ""
                     outcomeMsg = "${actor.name} strikes ${target.name} for ${dmgRoll.total} damage!$critText (Roll: ${attackRoll.total} vs AC ${targetAc})"
                     combatLog.add(CombatLogEntry(roundNumber, actor.name, outcomeMsg, attackRoll.isCriticalHit, dmgRoll.total))
+
+                    // Concentration Check on Target
+                    checkTargetConcentration(target, dmgRoll.total)
                 } else {
                     outcomeMsg = "${actor.name} swings at ${target.name} and MISSES! (Roll: ${attackRoll.total} vs AC ${targetAc})"
                     combatLog.add(CombatLogEntry(roundNumber, actor.name, outcomeMsg))
@@ -167,6 +217,7 @@ class TacticalCombatArena(
                 }
                 outcomeMsg = "${actor.name} hurls a burst of Radiant Fire at ${target.name} dealing ${spellDmg.total} damage!"
                 combatLog.add(CombatLogEntry(roundNumber, actor.name, outcomeMsg, false, spellDmg.total))
+                checkTargetConcentration(target, spellDmg.total)
                 actor.hasTakenAction = true
             }
 
@@ -195,16 +246,45 @@ class TacticalCombatArena(
         return outcomeMsg
     }
 
-    fun executeAITurn(aiActor: Combatant): String {
+    private fun checkTargetConcentration(target: Combatant, damageTaken: Int) {
+        if (target.activeConcentrationSpell != null && target.currentHp > 0) {
+            val dc = maxOf(10, damageTaken / 2)
+            val conSave = diceEngine.rollD20(target.conModifier)
+            if (conSave.total < dc) {
+                val brokenSpell = target.activeConcentrationSpell
+                target.activeConcentrationSpell = null
+                combatLog.add(CombatLogEntry(roundNumber, target.name, "Concentration on $brokenSpell BROKEN (Save: ${conSave.total} vs DC $dc)!"))
+            } else {
+                combatLog.add(CombatLogEntry(roundNumber, target.name, "Concentration maintained on ${target.activeConcentrationSpell} (Save: ${conSave.total} vs DC $dc)."))
+            }
+        }
+    }
+
+    fun executeAITurn(aiActor: Combatant, chosenAction: LegalCombatAction? = null): String {
+        if (!aiActor.canAct()) return "${aiActor.name} cannot act due to disabling condition (${aiActor.conditions.joinToString()})."
+
         val livingTargets = combatants.filter { it.isPlayerParty && !it.isDowned }
         if (livingTargets.isEmpty()) {
             checkVictoryConditions()
             return "No player targets remain."
         }
 
-        // Tactical Target Selection: Focus lowest HP target
-        val target = livingTargets.minByOrNull { it.currentHp } ?: livingTargets.first()
-        val rollType = if (target.isDodgeActive) RollType.DISADVANTAGE else RollType.NORMAL
+        val target = if (chosenAction != null) {
+            combatants.firstOrNull { it.id == chosenAction.targetId } ?: livingTargets.first()
+        } else {
+            // Tactical Heuristic: Focus lowest HP target
+            livingTargets.minByOrNull { it.currentHp } ?: livingTargets.first()
+        }
+
+        val hasAdvantage = target.conditions.contains("PRONE") || target.conditions.contains("PARALYZED") || target.conditions.contains("RESTRAINED")
+        val hasDisadvantage = target.isDodgeActive || aiActor.conditions.contains("POISONED")
+
+        val rollType = when {
+            hasAdvantage && !hasDisadvantage -> RollType.ADVANTAGE
+            hasDisadvantage && !hasAdvantage -> RollType.DISADVANTAGE
+            else -> RollType.NORMAL
+        }
+
         val attack = diceEngine.rollD20(aiActor.attackBonus, rollType)
         val targetAc = target.effectiveAc
 
@@ -213,6 +293,7 @@ class TacticalCombatArena(
             target.currentHp = maxOf(0, target.currentHp - dmg.total)
             if (target.currentHp == 0) target.isDowned = true
             val crit = if (attack.isCriticalHit) " [CRIT!]" else ""
+            checkTargetConcentration(target, dmg.total)
             "${aiActor.name} attacks ${target.name} for ${dmg.total} damage!$crit"
         } else {
             "${aiActor.name} attacks ${target.name} and MISSES!"

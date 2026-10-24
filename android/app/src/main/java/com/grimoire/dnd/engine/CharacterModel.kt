@@ -90,6 +90,7 @@ data class Character(
 
     val spellSlots: MutableMap<Int, SpellSlotPool> = mutableMapOf(),
     val activeConditions: MutableList<String> = mutableListOf(),
+    var activeConcentrationSpell: String? = null,
     var deathSaves: DeathSaveTracker = DeathSaveTracker()
 ) {
     val proficiencyBonus: Int
@@ -231,6 +232,43 @@ data class Character(
         return mapOf("healed" to healed, "hdRegained" to hdRegained)
     }
 
+    fun addCondition(condition: String) {
+        if (!activeConditions.contains(condition)) {
+            activeConditions.add(condition)
+        }
+    }
+
+    fun removeCondition(condition: String) {
+        activeConditions.remove(condition)
+    }
+
+    fun hasCondition(condition: String): Boolean = activeConditions.contains(condition)
+
+    fun castConcentrationSpell(spellName: String): String {
+        val previous = activeConcentrationSpell
+        activeConcentrationSpell = spellName
+        return if (previous != null) {
+            "Broke concentration on $previous and began concentrating on $spellName."
+        } else {
+            "Now concentrating on $spellName."
+        }
+    }
+
+    fun checkConcentration(damageTaken: Int, diceEngine: DiceEngine): Pair<Boolean, String> {
+        val spell = activeConcentrationSpell ?: return true to "Not concentrating on any spell."
+        val dc = maxOf(10, damageTaken / 2)
+        val conMod = getAbilityModifier(Ability.CON)
+        val roll = diceEngine.rollD20(modifier = conMod)
+        val success = roll.total >= dc
+
+        return if (success) {
+            true to "Concentration maintained on $spell (Rolled ${roll.total} vs DC $dc)."
+        } else {
+            activeConcentrationSpell = null
+            false to "Concentration BROKEN on $spell (Rolled ${roll.total} vs DC $dc)!"
+        }
+    }
+
     val xpForNextLevel: Int
         get() = when (level) {
             1 -> 300
@@ -238,6 +276,11 @@ data class Character(
             3 -> 2700
             4 -> 6500
             5 -> 14000
+            6 -> 23000
+            7 -> 34000
+            8 -> 48000
+            9 -> 64000
+            10 -> 85000
             else -> level * 10000
         }
 
@@ -260,24 +303,71 @@ data class Character(
         unlocked.add("Hit Points increased by +$hpGained (New Max: $hpMax HP)")
         unlocked.add("Hit Dice increased to $hitDiceMax d${characterClass.hitDie}")
 
-        if (level == 2) {
-            when (characterClass) {
-                CharacterClass.FIGHTER -> unlocked.add("Action Surge (Take 1 additional action per short rest)")
-                CharacterClass.WIZARD -> unlocked.add("Arcane Recovery & Extra 1st-level Spell Slot")
-                CharacterClass.ROGUE -> unlocked.add("Cunning Action (Dash, Disengage, or Hide as Bonus Action)")
-                CharacterClass.CLERIC -> unlocked.add("Channel Divinity: Turn Undead & Preserve Life")
-                CharacterClass.PALADIN -> unlocked.add("Divine Smite & 1st-level Spell Slots")
-                CharacterClass.DRUID -> unlocked.add("Wild Shape (Transform into beasts)")
-                CharacterClass.BARBARIAN -> unlocked.add("Reckless Attack & Danger Sense")
-                else -> unlocked.add("Level 2 Class Archetype Features")
+        when (level) {
+            2 -> {
+                when (characterClass) {
+                    CharacterClass.FIGHTER -> unlocked.add("Action Surge (Take 1 additional action per short rest)")
+                    CharacterClass.WIZARD -> unlocked.add("Arcane Recovery & Extra 1st-level Spell Slot")
+                    CharacterClass.ROGUE -> unlocked.add("Cunning Action (Dash, Disengage, or Hide as Bonus Action)")
+                    CharacterClass.CLERIC -> unlocked.add("Channel Divinity: Turn Undead & Preserve Life")
+                    CharacterClass.PALADIN -> unlocked.add("Divine Smite & 1st-level Spell Slots")
+                    CharacterClass.DRUID -> unlocked.add("Wild Shape (Transform into beasts)")
+                    CharacterClass.BARBARIAN -> unlocked.add("Reckless Attack & Danger Sense")
+                    else -> unlocked.add("Level 2 Class Archetype Features")
+                }
             }
-        } else if (level == 3) {
-            val sub = chosenSubclass ?: characterClass.primarySubclass
-            unlocked.add("Specialization Archetype: $sub")
-            if (characterClass in listOf(CharacterClass.WIZARD, CharacterClass.CLERIC, CharacterClass.SORCERER, CharacterClass.DRUID, CharacterClass.BARD)) {
-                val slot2 = spellSlots.getOrPut(2) { SpellSlotPool(2, 0, 0) }
-                spellSlots[2] = SpellSlotPool(2, slot2.maximum + 2, slot2.maximum + 2)
-                unlocked.add("2nd-Level Spell Slots Unlocked (2 Slots)")
+            3 -> {
+                val sub = chosenSubclass ?: characterClass.primarySubclass
+                unlocked.add("Specialization Archetype: $sub")
+                if (characterClass in listOf(CharacterClass.WIZARD, CharacterClass.CLERIC, CharacterClass.SORCERER, CharacterClass.DRUID, CharacterClass.BARD)) {
+                    val slot2 = spellSlots.getOrPut(2) { SpellSlotPool(2, 0, 0) }
+                    spellSlots[2] = SpellSlotPool(2, slot2.maximum + 2, slot2.maximum + 2)
+                    unlocked.add("2nd-Level Spell Slots Unlocked (2 Slots)")
+                }
+            }
+            4 -> {
+                unlocked.add("Ability Score Improvement (+2 to one ability or +1 to two abilities)")
+            }
+            5 -> {
+                unlocked.add("Proficiency Bonus increased to +3!")
+                if (characterClass in listOf(CharacterClass.FIGHTER, CharacterClass.BARBARIAN, CharacterClass.PALADIN, CharacterClass.RANGER)) {
+                    unlocked.add("Extra Attack (Attack twice whenever you take the Attack action)")
+                }
+                if (characterClass in listOf(CharacterClass.WIZARD, CharacterClass.CLERIC, CharacterClass.SORCERER, CharacterClass.DRUID, CharacterClass.BARD)) {
+                    val slot3 = spellSlots.getOrPut(3) { SpellSlotPool(3, 0, 0) }
+                    spellSlots[3] = SpellSlotPool(3, slot3.maximum + 2, slot3.maximum + 2)
+                    unlocked.add("3rd-Level Spell Slots Unlocked (Fireball, Revivify, etc.)")
+                }
+                if (characterClass == CharacterClass.ROGUE) {
+                    unlocked.add("Uncanny Dodge (Halve incoming attack damage as a reaction)")
+                }
+            }
+            6 -> {
+                unlocked.add("Level 6 Archetype Features & Extra Hit Die")
+            }
+            7 -> {
+                if (characterClass in listOf(CharacterClass.WIZARD, CharacterClass.CLERIC, CharacterClass.SORCERER, CharacterClass.DRUID, CharacterClass.BARD)) {
+                    val slot4 = spellSlots.getOrPut(4) { SpellSlotPool(4, 0, 0) }
+                    spellSlots[4] = SpellSlotPool(4, slot4.maximum + 1, slot4.maximum + 1)
+                    unlocked.add("4th-Level Spell Slots Unlocked")
+                }
+                if (characterClass == CharacterClass.ROGUE) {
+                    unlocked.add("Evasion (Take 0 damage on successful DEX saves against area effects)")
+                }
+            }
+            8 -> {
+                unlocked.add("Ability Score Improvement (+2 to an ability)")
+            }
+            9 -> {
+                unlocked.add("Proficiency Bonus increased to +4!")
+                if (characterClass in listOf(CharacterClass.WIZARD, CharacterClass.CLERIC, CharacterClass.SORCERER, CharacterClass.DRUID, CharacterClass.BARD)) {
+                    val slot5 = spellSlots.getOrPut(5) { SpellSlotPool(5, 0, 0) }
+                    spellSlots[5] = SpellSlotPool(5, slot5.maximum + 1, slot5.maximum + 1)
+                    unlocked.add("5th-Level Spell Slots Unlocked")
+                }
+            }
+            10 -> {
+                unlocked.add("Level 10 Master Tier Feature Unlock")
             }
         }
 
