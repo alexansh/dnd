@@ -37,8 +37,10 @@ import com.grimoire.dnd.dm.pipeline.ContextBuilder
 import com.grimoire.dnd.dm.pipeline.TurnPipelineCoordinator
 import com.grimoire.dnd.dm.provider.DeterministicFallbackProvider
 import com.grimoire.dnd.engine.*
+import com.grimoire.dnd.data.db.TurnContext
 import com.grimoire.dnd.ui.components.InventoryModal
 import com.grimoire.dnd.ui.components.LevelUpDialog
+import com.grimoire.dnd.ui.components.LivingJournalModal
 import com.grimoire.dnd.ui.components.PartyDeckBar
 import com.grimoire.dnd.ui.components.VisualSceneCard
 import com.grimoire.dnd.ui.theme.*
@@ -90,6 +92,8 @@ fun GrimoireGameScreen(
     var isMuted by remember { mutableStateOf(!soundManager.isMusicEnabled) }
     var showDiceTray by remember { mutableStateOf(false) }
     var showInventoryModal by remember { mutableStateOf(false) }
+    var showLivingJournalModal by remember { mutableStateOf(false) }
+    var activeTurnContext by remember { mutableStateOf<TurnContext?>(null) }
     var showLevelUpDialog by remember { mutableStateOf(false) }
     var activeRuleExplanation by remember { mutableStateOf<RuleExplanation?>(null) }
     var lastDiceLog by remember { mutableStateOf<String?>(null) }
@@ -203,6 +207,16 @@ fun GrimoireGameScreen(
                             tint = GoldAccent,
                             modifier = Modifier.size(20.dp)
                         )
+                    }
+                    Spacer(modifier = Modifier.width(2.dp))
+
+                    IconButton(onClick = {
+                        scope.launch {
+                            activeTurnContext = worldStateRepo.getTurnContext(campaignId)
+                            showLivingJournalModal = true
+                        }
+                    }) {
+                        Text("📜", fontSize = 18.sp)
                     }
                     Spacer(modifier = Modifier.width(2.dp))
 
@@ -1027,6 +1041,13 @@ fun GrimoireGameScreen(
                 refreshKey++
                 autoSave()
             }
+        )
+    }
+
+    if (showLivingJournalModal) {
+        LivingJournalModal(
+            turnContext = activeTurnContext,
+            onDismiss = { showLivingJournalModal = false }
         )
     }
 
