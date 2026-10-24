@@ -4,6 +4,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 *.sqlite3
+*.db
+*.db-wal
+*.db-shm
+.env
 
 # Android & Gradle
 .gradle/
@@ -13,6 +17,8 @@ android/build/
 build/
 local.properties
 .cxx/
+*.apk
+*.aab
 *.apk.idsig
 
 # IDE
