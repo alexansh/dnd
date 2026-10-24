@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -30,12 +31,18 @@ import com.grimoire.dnd.R
 import com.grimoire.dnd.audio.SoundManager
 import com.grimoire.dnd.data.LocalSaveManager
 import com.grimoire.dnd.data.SaveGameData
+import com.grimoire.dnd.data.db.GrimoireDatabase
+import com.grimoire.dnd.data.db.WorldStateRepository
+import com.grimoire.dnd.dm.pipeline.ContextBuilder
+import com.grimoire.dnd.dm.pipeline.TurnPipelineCoordinator
+import com.grimoire.dnd.dm.provider.DeterministicFallbackProvider
 import com.grimoire.dnd.engine.*
 import com.grimoire.dnd.ui.components.InventoryModal
 import com.grimoire.dnd.ui.components.LevelUpDialog
 import com.grimoire.dnd.ui.components.PartyDeckBar
 import com.grimoire.dnd.ui.components.VisualSceneCard
 import com.grimoire.dnd.ui.theme.*
+import kotlinx.coroutines.launch
 
 fun triggerHapticFeedback(context: Context, isCritical: Boolean = false) {
     try {
@@ -96,6 +103,26 @@ fun GrimoireGameScreen(
     val availableChoices = remember(refreshKey) { adventureEngine.getAvailableChoices() }
     val currentWhisper = remember(refreshKey, currentNode.nodeId) { dmEngine.generateDMWhisper(currentNode, character) }
     val currentTension = remember(refreshKey, currentNode.nodeId, character.hpCurrent) { dmEngine.calculateTensionLevel(character, currentNode) }
+
+    val scope = rememberCoroutineScope()
+    val worldStateRepo = remember {
+        val db = GrimoireDatabase.getInstance(context)
+        WorldStateRepository(db)
+    }
+    val pipelineCoordinator = remember {
+        val provider = DeterministicFallbackProvider()
+        val contextBuilder = ContextBuilder(worldStateRepo)
+        TurnPipelineCoordinator(
+            llmProvider = provider,
+            contextBuilder = contextBuilder,
+            diceEngine = diceEngine,
+            worldStateRepository = worldStateRepo
+        )
+    }
+    var playerFreeTextInput by remember { mutableStateOf("") }
+    var isProcessingTurn by remember { mutableStateOf(false) }
+    var liveDmNarration by remember { mutableStateOf<String?>(null) }
+    var dynamicSuggestedActions by remember { mutableStateOf<List<String>>(emptyList()) }
 
     fun autoSave() {
         val save = SaveGameData(
@@ -594,7 +621,7 @@ fun GrimoireGameScreen(
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Text(
-                            text = currentNarration,
+                            text = liveDmNarration ?: currentNarration,
                             fontSize = 15.sp,
                             lineHeight = 22.sp,
                             color = TextParchment,
@@ -661,7 +688,156 @@ fun GrimoireGameScreen(
                 }
             }
 
-            // 7. Section Label
+            // 7. Free-Text Player Action Attempt Card
+            item {
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = DarkSurface),
+                    border = BorderStroke(1.dp, GoldAccent),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text("⚔️", fontSize = 16.sp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "WHAT DO YOU ATTEMPT?",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GoldAccent,
+                                    letterSpacing = 1.sp
+                                )
+                            }
+                            if (isProcessingTurn) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(16.dp),
+                                    color = GoldAccent,
+                                    strokeWidth = 2.dp
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = playerFreeTextInput,
+                                onValueChange = { playerFreeTextInput = it },
+                                placeholder = {
+                                    Text(
+                                        "Say what you attempt... e.g. 'I inspect the runes', 'I drink a potion'",
+                                        fontSize = 12.sp,
+                                        color = TextMuted
+                                    )
+                                },
+                                singleLine = true,
+                                enabled = !isProcessingTurn,
+                                modifier = Modifier.weight(1f),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = GoldAccent,
+                                    unfocusedBorderColor = DarkBorder,
+                                    focusedTextColor = TextParchment,
+                                    unfocusedTextColor = TextParchment
+                                )
+                            )
+
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            IconButton(
+                                onClick = {
+                                    if (playerFreeTextInput.isNotBlank()) {
+                                        val attemptText = playerFreeTextInput
+                                        playerFreeTextInput = ""
+                                        scope.launch {
+                                            isProcessingTurn = true
+                                            try {
+                                                val result = pipelineCoordinator.executeTurn(
+                                                    campaignId = campaignId,
+                                                    character = character,
+                                                    playerFreeText = attemptText,
+                                                    locationTitle = currentNode.title
+                                                )
+                                                liveDmNarration = result.dmNarration
+                                                dynamicSuggestedActions = result.suggestedActions
+                                                if (result.ruleExplanation != null) {
+                                                    activeRuleExplanation = result.ruleExplanation
+                                                    lastDiceLog = result.ruleExplanation.breakdownText
+                                                }
+                                                if (result.diceRollOutcome != null) {
+                                                    if (result.diceRollOutcome.isCriticalHit) soundManager.playDiceCrit()
+                                                    else soundManager.playDiceRoll()
+                                                }
+                                                if (result.isCombatTriggered && onStartCombat != null) {
+                                                    onStartCombat(result.combatEnemyIds.ifEmpty { currentNode.monsterIds })
+                                                }
+                                                refreshKey++
+                                                autoSave()
+                                            } finally {
+                                                isProcessingTurn = false
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = !isProcessingTurn && playerFreeTextInput.isNotBlank(),
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(if (playerFreeTextInput.isNotBlank()) GoldAccent else DarkCardSurface, RoundedCornerShape(8.dp))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Submit Attempt",
+                                    tint = if (playerFreeTextInput.isNotBlank()) TextDark else TextMuted
+                                )
+                            }
+                        }
+
+                        // Dynamic DM Suggestion Pills
+                        if (dynamicSuggestedActions.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                "DM SUGGESTED ACTIONS:",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = TextMuted,
+                                letterSpacing = 1.sp
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                dynamicSuggestedActions.take(3).forEach { suggestion ->
+                                    Surface(
+                                        onClick = {
+                                            playerFreeTextInput = suggestion
+                                        },
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = DarkCardSurface,
+                                        border = BorderStroke(1.dp, GoldMuted)
+                                    ) {
+                                        Text(
+                                            text = suggestion,
+                                            fontSize = 11.sp,
+                                            color = GoldAccent,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 8. Section Label
             item {
                 Text(
                     text = "AVAILABLE ACTIONS & DIALOGUE",
