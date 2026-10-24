@@ -26,7 +26,8 @@ class TurnPipelineCoordinator(
     private val contextBuilder: ContextBuilder,
     private val validator: RuleLegalityValidator = RuleLegalityValidator(),
     private val diceEngine: DiceEngine = DiceEngine(),
-    private val worldStateRepository: WorldStateRepository? = null
+    private val worldStateRepository: WorldStateRepository? = null,
+    private val canonAuditor: CanonAuditor = CanonAuditor()
 ) {
     private val gson = Gson()
 
@@ -181,6 +182,8 @@ class TurnPipelineCoordinator(
 
         // Step 5: Record Turn & Commit to Room
         val currentTurn = (worldStateRepository?.getLatestTurnIndex(campaignId) ?: 0) + 1
+        val establishedCanon = worldStateRepository?.getTurnContext(campaignId)?.canonFacts ?: emptyList()
+
         val newCanonRecords = approvedProposal.proposedCanonFacts.map { fact ->
             CanonLedgerRecord(
                 id = "canon_${System.currentTimeMillis()}_${fact.subject.hashCode()}",
@@ -190,6 +193,9 @@ class TurnPipelineCoordinator(
                 subject = fact.subject,
                 assertionText = fact.assertionText
             )
+        }.filter { record ->
+            val audit = canonAuditor.auditAssertion(record, establishedCanon)
+            !audit.hasContradiction
         }
 
         worldStateRepository?.recordTurn(
