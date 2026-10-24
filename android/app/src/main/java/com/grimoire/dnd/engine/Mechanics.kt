@@ -114,4 +114,13 @@ data class DeathSaveTracker(
             return false to "Failure ($failures/3)."
         }
     }
+
+    fun takeDamageAtZeroHp(isCritical: Boolean = false) {
+        val added = if (isCritical) 2 else 1
+        failures += added
+        isStabilized = false
+        if (failures >= 3) {
+            isDead = true
+        }
+    }
 }

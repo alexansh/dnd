@@ -41,7 +41,16 @@ data class RollOutcome(
     }
 }
 
-class DiceEngine(private val rng: Random = Random.Default) {
+class DiceEngine(
+    private var rng: Random = Random.Default,
+    var initialSeed: Long? = null
+) {
+    constructor(seed: Long) : this(Random(seed), seed)
+
+    fun reseed(seed: Long) {
+        this.rng = Random(seed)
+        this.initialSeed = seed
+    }
 
     fun rollDie(sides: Int): Int {
         require(sides >= 1) { "Die must have at least 1 side." }

@@ -50,5 +50,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.google.gson)
 
+    testImplementation(libs.junit)
+    testImplementation(kotlin("test"))
+
     debugImplementation(libs.androidx.ui.tooling)
 }
