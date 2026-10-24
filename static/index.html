@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mythos 5E - Solo AI D&D Tabletop</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Marked for Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- Canvas Confetti for Natural 20s -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="dark-theme">
+  <!-- APP HEADER -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo-group">
+        <span class="logo-icon">⚔️</span>
+        <div class="logo-text">
+          <span class="brand-title">MYTHOS 5E</span>
+          <span class="brand-sub">Solo AI Virtual Tabletop</span>
+        </div>
+      </div>
+      <div id="campaign-badge" class="badge location-badge" title="Current Location">
+        <i data-lucide="map-pin"></i>
+        <span id="header-location">No Campaign Loaded</span>
+      </div>
+      <div id="combat-indicator" class="badge combat-badge hidden">
+        <i data-lucide="swords"></i>
+        <span id="combat-round-text">COMBAT: ROUND 1</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <div id="save-status-indicator" class="save-indicator">
+        <i data-lucide="check-circle-2"></i>
+        <span id="save-status-text">Saved</span>
+      </div>
+      <button id="btn-save-campaign" class="btn btn-secondary btn-sm" title="Save Game (Persists to SQLite)">
+        <i data-lucide="save"></i>
+        <span>Save Game</span>
+      </button>
+      <button id="btn-campaigns" class="btn btn-secondary btn-sm" title="Saved Adventures">
+        <i data-lucide="folder"></i>
+        <span>Adventures</span>
+      </button>
+      <button id="btn-new-campaign" class="btn btn-primary btn-sm" title="New Adventure">
+        <i data-lucide="plus"></i>
+        <span>New Game</span>
+      </button>
+      <button id="btn-settings" class="btn btn-icon" title="Settings & Gemini API Key">
+        <i data-lucide="settings"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN VIRTUAL TABLETOP LAYOUT -->
+  <main class="vtt-grid">
+    <!-- LEFT PANEL: CHARACTER SHEET -->
+    <aside class="panel left-panel character-panel">
+      <div class="panel-header">
+        <div class="char-title-wrap">
+          <h2 id="char-name">Hero Name</h2>
+          <span id="char-meta" class="char-meta">Level 1 Adventurer</span>
+        </div>
+        <button id="btn-edit-char" class="btn btn-icon btn-sm" title="View Full Stats">
+          <i data-lucide="shield"></i>
+        </button>
+      </div>
+
+      <div class="panel-content scrollable">
+        <!-- VITAL STATS HUD -->
+        <div class="vitals-card">
+          <!-- HP Section -->
+          <div class="hp-section">
+            <div class="hp-header">
+              <span class="vital-label">HIT POINTS</span>
+              <span class="hp-numbers"><span id="char-hp-current">12</span> / <span id="char-hp-max">12</span></span>
+            </div>
+            <div class="hp-bar-bg">
+              <div id="char-hp-bar" class="hp-bar-fill" style="width: 100%;"></div>
+            </div>
+            <div class="hp-quick-buttons">
+              <button class="hp-btn" onclick="adjustHP(-5)">-5</button>
+              <button class="hp-btn" onclick="adjustHP(-1)">-1</button>
+              <button class="hp-btn heal" onclick="adjustHP(1)">+1</button>
+              <button class="hp-btn heal" onclick="adjustHP(5)">+5</button>
+            </div>
+          </div>
+
+          <!-- Secondary Vitals -->
+          <div class="vitals-row">
+            <div class="vital-stat">
+              <span class="vital-icon">🛡️</span>
+              <span id="char-ac" class="vital-val">16</span>
+              <span class="vital-name">AC</span>
+            </div>
+            <div class="vital-stat">
+              <span class="vital-icon">⚡</span>
+              <span id="char-init" class="vital-val">+0</span>
+              <span class="vital-name">INIT</span>
+            </div>
+            <div class="vital-stat">
+              <span class="vital-icon">👟</span>
+              <span id="char-speed" class="vital-val">30</span>
+              <span class="vital-name">SPEED</span>
+            </div>
+            <div class="vital-stat">
+              <span class="vital-icon">✨</span>
+              <span id="char-prof" class="vital-val">+2</span>
+              <span class="vital-name">PROF</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- ABILITY SCORES -->
+        <div class="section-card">
+          <div class="section-title">ABILITY SCORES <span class="hint">(Click to roll)</span></div>
+          <div class="ability-grid">
+            <div class="ability-box" onclick="rollAbilityCheck('Strength', 'str')">
+              <span class="ability-name">STR</span>
+              <span id="score-str-mod" class="ability-mod">+3</span>
+              <span id="score-str-val" class="ability-score">16</span>
+            </div>
+            <div class="ability-box" onclick="rollAbilityCheck('Dexterity', 'dex')">
+              <span class="ability-name">DEX</span>
+              <span id="score-dex-mod" class="ability-mod">+0</span>
+              <span id="score-dex-val" class="ability-score">10</span>
+            </div>
+            <div class="ability-box" onclick="rollAbilityCheck('Constitution', 'con')">
+              <span class="ability-name">CON</span>
+              <span id="score-con-mod" class="ability-mod">+2</span>
+              <span id="score-con-val" class="ability-score">14</span>
+            </div>
+            <div class="ability-box" onclick="rollAbilityCheck('Intelligence', 'int')">
+              <span class="ability-name">INT</span>
+              <span id="score-int-mod" class="ability-mod">-1</span>
+              <span id="score-int-val" class="ability-score">9</span>
+            </div>
+            <div class="ability-box" onclick="rollAbilityCheck('Wisdom', 'wis')">
+              <span class="ability-name">WIS</span>
+              <span id="score-wis-mod" class="ability-mod">+1</span>
+              <span id="score-wis-val" class="ability-score">12</span>
+            </div>
+            <div class="ability-box" onclick="rollAbilityCheck('Charisma', 'cha')">
+              <span class="ability-name">CHA</span>
+              <span id="score-cha-mod" class="ability-mod">+2</span>
+              <span id="score-cha-val" class="ability-score">15</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CHARACTER TABS: SKILLS / SPELLS / INVENTORY -->
+        <div class="char-tabs">
+          <button class="tab-btn active" data-tab="tab-skills">Skills</button>
+          <button class="tab-btn" data-tab="tab-inventory">Inventory (<span id="inv-count">0</span>)</button>
+          <button class="tab-btn" data-tab="tab-spells">Spells</button>
+        </div>
+
+        <!-- TAB: SKILLS -->
+        <div id="tab-skills" class="tab-pane active">
+          <div class="skills-list" id="skills-list">
+            <!-- Dynamically populated skills -->
+          </div>
+        </div>
+
+        <!-- TAB: INVENTORY -->
+        <div id="tab-inventory" class="tab-pane">
+          <!-- Currency bar -->
+          <div class="currency-bar">
+            <span class="coin gold">🪙 <span id="coin-gp">25</span> GP</span>
+            <span class="coin silver">⚪ <span id="coin-sp">5</span> SP</span>
+            <span class="coin copper">🟤 <span id="coin-cp">0</span> CP</span>
+          </div>
+          <div class="inventory-list" id="inventory-list">
+            <!-- Inventory items -->
+          </div>
+        </div>
+
+        <!-- TAB: SPELLS -->
+        <div id="tab-spells" class="tab-pane">
+          <div id="spell-slots-container" class="spell-slots-grid">
+            <!-- Spell slots -->
+          </div>
+          <div id="spells-list" class="spells-list">
+            <!-- Spells -->
+          </div>
+        </div>
+
+        <!-- REST ACTIONS -->
+        <div class="rest-actions">
+          <button class="btn btn-outline btn-sm" onclick="takeRest('short')">
+            <i data-lucide="coffee"></i> Short Rest
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="takeRest('long')">
+            <i data-lucide="moon"></i> Long Rest
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- CENTER PANEL: NARRATIVE CHRONICLE & TABLETOP ACTION TRAY -->
+    <section class="panel center-panel chronicle-panel">
+      <!-- CHRONICLE FEED -->
+      <div id="chronicle-feed" class="chronicle-feed scrollable">
+        <!-- Messages rendered dynamically -->
+      </div>
+
+      <!-- INTERACTIVE PROMPT & ACTION TRAY (FIXED AT BOTTOM) -->
+      <div class="action-dock">
+        <!-- REQUIRED CHECK CALLOUT (Appears when DM asks for roll) -->
+        <div id="required-check-banner" class="required-check-banner hidden">
+          <div class="rc-left">
+            <span class="rc-icon">⚡</span>
+            <div class="rc-text">
+              <span id="rc-title" class="rc-title">Dungeon Master Requests a Check</span>
+              <span id="rc-desc" class="rc-desc">Perception DC 13 to detect movement</span>
+            </div>
+          </div>
+          <button id="btn-roll-required" class="btn btn-amber">
+            <i data-lucide="dice-5"></i>
+            <span id="btn-roll-required-text">Roll D20</span>
+          </button>
+        </div>
+
+        <!-- SUGGESTED ACTIONS BAR -->
+        <div id="suggested-actions-tray" class="suggested-actions-tray">
+          <!-- Suggested chips -->
+        </div>
+
+        <!-- DICE TRAY TOGGLE & QUICK ROLL BAR -->
+        <div class="dice-bar">
+          <div class="dice-quick-list">
+            <button class="dice-chip" onclick="quickRollDie(20)" title="Roll d20">d20</button>
+            <button class="dice-chip" onclick="quickRollDie(12)" title="Roll d12">d12</button>
+            <button class="dice-chip" onclick="quickRollDie(10)" title="Roll d10">d10</button>
+            <button class="dice-chip" onclick="quickRollDie(8)" title="Roll d8">d8</button>
+            <button class="dice-chip" onclick="quickRollDie(6)" title="Roll d6">d6</button>
+            <button class="dice-chip" onclick="quickRollDie(4)" title="Roll d4">d4</button>
+            <button class="dice-chip" onclick="quickRollDie(100)" title="Roll d100">d100</button>
+          </div>
+          <div class="roll-modifiers-group">
+            <label class="toggle-chip" id="chip-adv" onclick="toggleAdvantage('adv')">Adv</label>
+            <label class="toggle-chip" id="chip-disadv" onclick="toggleAdvantage('dis')">Dis</label>
+            <div class="mod-input-wrap">
+              <span class="mod-label">Mod:</span>
+              <input type="number" id="dice-custom-mod" value="0" class="input-tiny" title="Manual Modifier">
+            </div>
+          </div>
+        </div>
+
+        <!-- INPUT BAR -->
+        <form id="action-form" class="action-form" onsubmit="handleSendAction(event)">
+          <div class="input-wrapper">
+            <textarea 
+              id="action-input" 
+              placeholder="What would you like to do? (e.g. 'I inspect the carriage for tracks', 'I draw my sword and demand they surrender')" 
+              rows="1"
+              autofocus
+            ></textarea>
+            <button type="submit" id="btn-send-action" class="btn btn-primary btn-send">
+              <i data-lucide="send"></i>
+            </button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL: QUEST JOURNAL, NPCS & COMBAT STATUS -->
+    <aside class="panel right-panel journal-panel">
+      <div class="panel-header">
+        <h3 class="panel-title"><i data-lucide="compass"></i> Adventure Lore</h3>
+      </div>
+
+      <div class="panel-content scrollable">
+        <!-- QUEST LOG -->
+        <div class="section-card">
+          <div class="section-title">
+            <span>QUEST OBJECTIVES</span>
+            <span id="quest-count-badge" class="badge-mini">0</span>
+          </div>
+          <div id="quest-list" class="quest-list">
+            <!-- Quests -->
+          </div>
+        </div>
+
+        <!-- COMBAT & ENCOUNTERS -->
+        <div class="section-card">
+          <div class="section-title">
+            <span>TACTICAL ENCOUNTER</span>
+          </div>
+          <div id="combat-card-content" class="combat-card-content">
+            <div class="peace-mode-msg">
+              <i data-lucide="shield"></i>
+              <p>No active combat. You are free to explore, dialogue, and investigate.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- NOTES & MEMORY -->
+        <div class="section-card">
+          <div class="section-title">
+            <span>DISCOVERED LOCATIONS & NPCS</span>
+          </div>
+          <div id="lore-notes-container" class="lore-notes">
+            <p class="empty-hint">As you speak with townsfolk and explore dungeons, key people and sites will be chronicled here.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- MODALS -->
+
+  <!-- MODAL: SETTINGS & GEMINI API KEY -->
+  <div id="modal-settings" class="modal-backdrop hidden">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <i data-lucide="settings" class="modal-icon"></i>
+          <h3>Dungeon Master Settings</h3>
+        </div>
+        <button class="btn btn-icon btn-sm" onclick="closeModal('modal-settings')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="setting-gemini-key">
+            Google Gemini API Key
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="link-external">Get Free Key ↗</a>
+          </label>
+          <input type="password" id="setting-gemini-key" placeholder="AIzaSy..." class="input-text">
+          <span class="field-hint">Your key is stored safely on your local machine and never shared. Gemini API is free for personal use.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="setting-model-name">AI Model</label>
+          <select id="setting-model-name" class="input-select">
+            <option value="gemini-3.8-flash" selected>gemini-3.8-flash (Recommended & Latest)</option>
+            <option value="gemini-1.5-flash">gemini-1.5-flash (Legacy Fast)</option>
+            <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Lore)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="setting-custom-dm">Custom DM Persona / Playstyle</label>
+          <textarea id="setting-custom-dm" rows="3" placeholder="e.g. Grimdark dark fantasy tone, harsh survival elements, lethal combat, or high-magic whimsical fairy tale." class="input-textarea"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-settings')">Cancel</button>
+        <button class="btn btn-primary" onclick="saveSettings()">Save Configuration</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: D&D WORKFLOW WIZARD (CAMPAIGN -> CHARACTER -> START JOURNEY) -->
+  <div id="modal-new-campaign" class="modal-backdrop hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <i data-lucide="sparkles" class="modal-icon"></i>
+          <h3 id="wizard-header-title">Begin a New D&D Adventure</h3>
+        </div>
+        <button class="btn btn-icon btn-sm" onclick="closeModal('modal-new-campaign')">✕</button>
+      </div>
+
+      <!-- STEP INDICATOR BAR -->
+      <div class="wizard-stepper">
+        <div id="step-tab-1" class="step-indicator active">
+          <span class="step-num">1</span>
+          <span class="step-text">Choose Campaign</span>
+        </div>
+        <div class="step-connector"></div>
+        <div id="step-tab-2" class="step-indicator">
+          <span class="step-num">2</span>
+          <span class="step-text">Character Creation (Session 0)</span>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <!-- STEP 1: SELECT CAMPAIGN SETTING -->
+        <div id="wizard-step-1" class="wizard-step-content active">
+          <h4 class="modal-subtitle">Select an Adventure Module</h4>
+          <p class="field-hint" style="margin-bottom: 0.75rem;">Choose an official starting quest or craft your own custom adventure realm.</p>
+          
+          <div class="scenario-selector-grid" id="preset-scenarios-grid">
+            <!-- Populated dynamically -->
+          </div>
+
+          <div class="form-group" style="margin-top: 1.25rem;">
+            <label for="custom-campaign-title">Adventure Title</label>
+            <input type="text" id="custom-campaign-title" value="The Journey Begins" class="input-text">
+          </div>
+
+          <div class="form-group" style="margin-top: 0.75rem;">
+            <label for="custom-campaign-premise">Custom Setting Premise (Optional)</label>
+            <input type="text" id="custom-campaign-premise" placeholder="Leave empty to use the module default, or describe your own realm." class="input-text">
+          </div>
+        </div>
+
+        <!-- STEP 2: CHARACTER CREATION -->
+        <div id="wizard-step-2" class="wizard-step-content">
+          <div class="char-create-mode-tabs">
+            <button id="btn-mode-preset" class="btn btn-secondary btn-sm active" onclick="switchCharCreationMode('preset')">
+              <i data-lucide="user-check"></i> Pre-made Archetypes
+            </button>
+            <button id="btn-mode-custom" class="btn btn-secondary btn-sm" onclick="switchCharCreationMode('custom')">
+              <i data-lucide="user-plus"></i> Custom Character Creator
+            </button>
+          </div>
+
+          <!-- SUB-VIEW A: PRE-MADE ARCHETYPES -->
+          <div id="char-mode-preset" class="char-mode-view active">
+            <h4 class="modal-subtitle" style="margin-top: 0.75rem;">Select Your Hero</h4>
+            <div class="hero-selector-grid" id="preset-heroes-grid">
+              <!-- Preset character cards -->
+            </div>
+          </div>
+
+          <!-- SUB-VIEW B: CUSTOM CHARACTER BUILDER -->
+          <div id="char-mode-custom" class="char-mode-view">
+            <h4 class="modal-subtitle" style="margin-top: 0.75rem;">Custom Hero Sheet</h4>
+            
+            <div class="grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem;">
+              <div class="form-group">
+                <label for="custom-char-name">Character Name</label>
+                <input type="text" id="custom-char-name" value="Rowan Wildheart" class="input-text">
+              </div>
+              <div class="form-group">
+                <label for="custom-char-race">Race</label>
+                <select id="custom-char-race" class="input-select">
+                  <option value="Human">Human</option>
+                  <option value="Elf (High)">Elf (High)</option>
+                  <option value="Elf (Wood)">Elf (Wood)</option>
+                  <option value="Dwarf (Mountain)">Dwarf (Mountain)</option>
+                  <option value="Dwarf (Hill)">Dwarf (Hill)</option>
+                  <option value="Halfling (Lightfoot)">Halfling (Lightfoot)</option>
+                  <option value="Tiefling">Tiefling</option>
+                  <option value="Dragonborn">Dragonborn</option>
+                  <option value="Half-Orc">Half-Orc</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 0.5rem;">
+              <div class="form-group">
+                <label for="custom-char-class">Class</label>
+                <select id="custom-char-class" class="input-select" onchange="handleCustomClassChange()">
+                  <option value="Fighter">Fighter (d10 HP, Heavy Armor & Martial Weapons)</option>
+                  <option value="Paladin">Paladin (d10 HP, Divine Smite & Heavy Armor)</option>
+                  <option value="Rogue">Rogue (d8 HP, Sneak Attack & Finesse)</option>
+                  <option value="Wizard">Wizard (d6 HP, Arcane Spells & Spellbook)</option>
+                  <option value="Cleric">Cleric (d8 HP, Healing & Divine Magic)</option>
+                  <option value="Barbarian">Barbarian (d12 HP, Rage & Unarmored Defense)</option>
+                  <option value="Ranger">Ranger (d10 HP, Archery & Wilderness Tracking)</option>
+                  <option value="Warlock">Warlock (d8 HP, Eldritch Invocations & Pact)</option>
+                  <option value="Bard">Bard (d8 HP, Bardic Inspiration & Charisma)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="custom-char-bg">Background & Alignment</label>
+                <select id="custom-char-bg" class="input-select">
+                  <option value="Folk Hero">Folk Hero (Neutral Good)</option>
+                  <option value="Noble">Noble (Lawful Good)</option>
+                  <option value="Criminal / Spy">Criminal / Spy (Chaotic Neutral)</option>
+                  <option value="Soldier">Soldier (Lawful Neutral)</option>
+                  <option value="Sage">Sage (Neutral)</option>
+                  <option value="Outlander">Outlander (Chaotic Good)</option>
+                  <option value="Acolyte">Acolyte (Lawful Good)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Ability Scores (Standard Array / Roll) -->
+            <div style="margin-top: 0.9rem;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                <label style="font-size: 0.8rem; font-weight: 700; color: var(--text-gold);">Ability Scores (Standard Array 15, 14, 13, 12, 10, 8)</label>
+                <button type="button" class="btn btn-outline btn-sm" onclick="rollRandomCustomStats()">
+                  <i data-lucide="dice-5"></i> Roll Stats (4d6 drop lowest)
+                </button>
+              </div>
+              <div class="custom-ability-row">
+                <div class="stat-input-box">
+                  <span>STR</span>
+                  <input type="number" id="custom-stat-str" value="15" min="3" max="20" class="input-tiny-num">
+                </div>
+                <div class="stat-input-box">
+                  <span>DEX</span>
+                  <input type="number" id="custom-stat-dex" value="14" min="3" max="20" class="input-tiny-num">
+                </div>
+                <div class="stat-input-box">
+                  <span>CON</span>
+                  <input type="number" id="custom-stat-con" value="13" min="3" max="20" class="input-tiny-num">
+                </div>
+                <div class="stat-input-box">
+                  <span>INT</span>
+                  <input type="number" id="custom-stat-int" value="10" min="3" max="20" class="input-tiny-num">
+                </div>
+                <div class="stat-input-box">
+                  <span>WIS</span>
+                  <input type="number" id="custom-stat-wis" value="12" min="3" max="20" class="input-tiny-num">
+                </div>
+                <div class="stat-input-box">
+                  <span>CHA</span>
+                  <input type="number" id="custom-stat-cha" value="8" min="3" max="20" class="input-tiny-num">
+                </div>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-top: 0.9rem;">
+              <label for="custom-char-backstory">Hero Backstory & Motivation</label>
+              <textarea id="custom-char-backstory" rows="2" placeholder="Why did your hero take up the blade or spell? What personal quest drives them?" class="input-textarea"></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-wizard-back" class="btn btn-secondary hidden" onclick="wizardStepBack()">
+          <i data-lucide="arrow-left"></i> Back
+        </button>
+        <button id="btn-wizard-next" class="btn btn-primary btn-lg" onclick="wizardStepNext()">
+          Next: Create Character <i data-lucide="arrow-right"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: SAVED ADVENTURES (LOAD GAME) -->
+  <div id="modal-campaigns" class="modal-backdrop hidden">
+    <div class="modal-card modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <i data-lucide="folder" class="modal-icon"></i>
+          <h3>Saved Adventures (Campaign Save Slots)</h3>
+        </div>
+        <button class="btn btn-icon btn-sm" onclick="closeModal('modal-campaigns')">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="field-hint" style="margin-bottom: 0.5rem;">All campaigns are permanently saved to local SQLite. You can close all terminals or restart your computer anytime—your exact inventory, chronicle, and stats are preserved.</p>
+        <div id="saved-campaigns-list" class="saved-campaigns-list">
+          <!-- Saved campaigns -->
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal('modal-campaigns')">Close</button>
+        <button class="btn btn-primary" onclick="closeModal('modal-campaigns'); openNewCampaignModal();">
+          <i data-lucide="plus"></i> New Campaign
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DICE ROLL MODAL / ANIMATION OVERLAY -->
+  <div id="dice-overlay" class="dice-overlay hidden" onclick="closeDiceOverlay()">
+    <div class="dice-display-card" onclick="event.stopPropagation()">
+      <div class="dice-display-title" id="dice-anim-title">ROLLING D20...</div>
+      <div class="d20-graphic-box">
+        <div id="d20-animated-die" class="d20-die rolling">20</div>
+      </div>
+      <div class="dice-math-breakdown" id="dice-anim-breakdown">
+        <span>Natural: 18</span> + <span>Modifier: +4</span> = <strong class="dice-grand-total">22</strong>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="applyDiceRollToTurn()">
+        Accept & Send to DM
+      </button>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="/static/js/dice.js"></script>
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
