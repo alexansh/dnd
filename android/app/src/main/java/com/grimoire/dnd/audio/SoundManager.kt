@@ -71,16 +71,18 @@ class SoundManager private constructor(context: Context) {
     }
 
     private var currentTrackRes: Int = R.raw.ambient_music
+    private var currentAssetTrack: String? = null
 
     fun playMusic(trackRes: Int) {
         if (!isMusicEnabled) return
         try {
-            if (mediaPlayer != null && currentTrackRes == trackRes && mediaPlayer!!.isPlaying) {
+            if (mediaPlayer != null && currentTrackRes == trackRes && currentAssetTrack == null && mediaPlayer!!.isPlaying) {
                 return
             }
             mediaPlayer?.stop()
             mediaPlayer?.release()
             currentTrackRes = trackRes
+            currentAssetTrack = null
             mediaPlayer = MediaPlayer.create(appContext, trackRes).apply {
                 isLooping = true
                 setVolume(0.4f, 0.4f)
@@ -89,10 +91,64 @@ class SoundManager private constructor(context: Context) {
         } catch (_: Exception) {}
     }
 
+    /**
+     * Dynamically switches between the 50+ procedural scene soundtracks based on current environment.
+     */
+    fun playSceneSoundtrack(sceneTag: String, variationIndex: Int = 1) {
+        if (!isMusicEnabled) return
+        val normalizedTag = sceneTag.lowercase()
+        val themePrefix = when {
+            normalizedTag.contains("tavern") || normalizedTag.contains("inn") -> "tavern"
+            normalizedTag.contains("crypt") || normalizedTag.contains("tomb") || normalizedTag.contains("grave") -> "crypt"
+            normalizedTag.contains("forge") || normalizedTag.contains("fire") || normalizedTag.contains("lava") -> "forge"
+            normalizedTag.contains("cathedral") || normalizedTag.contains("temple") || normalizedTag.contains("altar") -> "cathedral"
+            normalizedTag.contains("forest") || normalizedTag.contains("wood") || normalizedTag.contains("grove") -> "forest"
+            normalizedTag.contains("cavern") || normalizedTag.contains("cave") || normalizedTag.contains("mine") -> "cavern"
+            normalizedTag.contains("boss") || normalizedTag.contains("lord") || normalizedTag.contains("dragon") -> "boss"
+            normalizedTag.contains("combat") || normalizedTag.contains("battle") || normalizedTag.contains("fight") -> "combat"
+            normalizedTag.contains("rest") || normalizedTag.contains("camp") -> "rest"
+            else -> "mystery"
+        }
+
+        val maxVars = if (themePrefix == "mystery" || themePrefix == "rest") 3 else 6
+        val selectedIdx = ((variationIndex - 1).coerceAtLeast(0) % maxVars) + 1
+        val assetFileName = "track_${themePrefix}_${String.format("%02d", selectedIdx)}.wav"
+
+        if (currentAssetTrack == assetFileName && mediaPlayer?.isPlaying == true) {
+            return
+        }
+
+        try {
+            val afd = appContext.assets.openFd("audio/$assetFileName")
+            mediaPlayer?.stop()
+            mediaPlayer?.release()
+            currentAssetTrack = assetFileName
+            currentTrackRes = 0
+
+            mediaPlayer = MediaPlayer().apply {
+                setDataSource(afd.fileDescriptor, afd.startOffset, afd.length)
+                afd.close()
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_GAME)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                )
+                prepare()
+                isLooping = true
+                setVolume(0.45f, 0.45f)
+                start()
+            }
+        } catch (_: Exception) {
+            // Fallback to bundled raw track if asset streaming fails
+            startAmbientMusic()
+        }
+    }
+
     fun startAmbientMusic() = playMusic(R.raw.ambient_music)
-    fun playBattleMusic() = playMusic(R.raw.music_battle)
-    fun playDungeonMusic() = playMusic(R.raw.music_dungeon)
-    fun playBossMusic() = playMusic(R.raw.music_boss)
+    fun playBattleMusic() = playSceneSoundtrack("combat", 1)
+    fun playDungeonMusic() = playSceneSoundtrack("crypt", 1)
+    fun playBossMusic() = playSceneSoundtrack("boss", 1)
 
     fun pauseAmbientMusic() {
         try {

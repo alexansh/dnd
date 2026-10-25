@@ -128,6 +128,12 @@ fun GrimoireGameScreen(
     var liveDmNarration by remember { mutableStateOf<String?>(null) }
     var dynamicSuggestedActions by remember { mutableStateOf<List<String>>(emptyList()) }
 
+    LaunchedEffect(currentNode.nodeId) {
+        if (!isMuted) {
+            soundManager.playSceneSoundtrack(currentNode.sceneVisualTag)
+        }
+    }
+
     fun autoSave() {
         val save = SaveGameData(
             slotId = character.id,

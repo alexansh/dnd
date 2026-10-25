@@ -65,9 +65,14 @@ Instead, the player writes in free text what their character attempts in-world, 
 - **Dynamic Approval:** Companions approve or disapprove of player choices (Heroic, Ruthless, Mercenary, Mercy).
 - **Mutiny / Desertion:** If companion approval drops to critical levels ($\le 15$), companions protest and abandon the party in disgust.
 
-### 5. Living Chronicle & Presentation
+### 5. Living Chronicle & Rich Open-Source Content Library
 - **Living Journal:** Real-time modal inspecting countdown clocks, quest logs, NPC Codex, and canon history.
-- **Atmospheric Visual Scenes:** Dynamic scene card artwork with fantasy environments (tavern, crypt, dwarven forge, cathedral).
+- **55+ Scene Backdrops:** Dynamic 16:9 cinematic environmental backdrops (Taverns, Cathedrals, Magma Forges, Underdark Grottos, Feywild Spires, Coral Caverns).
+- **25+ Character Companion Portraits:** High-resolution fantasy portraits spanning all classes and races.
+- **55+ Bestiary Monster Cards:** Stat blocks and artwork covering Undead, Dragons, Aberrations, Fiends, Elementals, and Beasts.
+- **54 Dynamic Soundtracks:** High-fidelity ambient audio loops switching seamlessly based on current scene tag (`tavern`, `crypt`, `forge`, `forest`, `combat`, `boss`, etc.).
+- **104 Spells & Cantrips:** 50 Cantrips + 54 Leveled Spells (1st–5th level) with full SRD 5.1 formulas, casting times, and concentration rules.
+- **105 Weapons & Equipments:** 54 Simple/Martial/Magical Weapons + 51 Light/Medium/Heavy Armors, Shields, Adventuring Gear, Potions, and Wondrous Relics.
 - **Tactile Feedback:** Multi-stage haptic vibration on dice rolls and critical strikes.
 
 ---

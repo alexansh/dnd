@@ -1,5 +1,6 @@
 package com.grimoire.dnd.ui.components
 
+import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -11,12 +12,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -65,6 +69,37 @@ fun VisualSceneCard(
         )
     }
 
+    val context = LocalContext.current
+    val customSceneBitmap = remember(visualTag) {
+        try {
+            val normalized = visualTag.lowercase()
+            val candidateNames = listOf(
+                "scene_$normalized.jpg",
+                "$normalized.jpg",
+                if (normalized.contains("tavern")) "scene_rusty_anchor_tavern.jpg"
+                else if (normalized.contains("crypt") || normalized.contains("grave")) "scene_sunken_crypt_vault.jpg"
+                else if (normalized.contains("forge")) "scene_dwarven_magma_forge.jpg"
+                else if (normalized.contains("cathedral") || normalized.contains("sanctum")) "scene_gothic_cathedral_sanctum.jpg"
+                else if (normalized.contains("forest") || normalized.contains("wood")) "scene_whispering_woods.jpg"
+                else "scene_gothic_cathedral_sanctum.jpg"
+            )
+            var foundBitmap: androidx.compose.ui.graphics.ImageBitmap? = null
+            for (candidate in candidateNames) {
+                try {
+                    context.assets.open("art/$candidate").use { stream ->
+                        BitmapFactory.decodeStream(stream)?.let {
+                            foundBitmap = it.asImageBitmap()
+                        }
+                    }
+                    if (foundBitmap != null) break
+                } catch (_: Exception) {}
+            }
+            foundBitmap
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     Card(
         shape = RoundedCornerShape(14.dp),
         colors = CardDefaults.cardColors(containerColor = DarkSurface),
@@ -74,15 +109,26 @@ fun VisualSceneCard(
             .border(1.dp, GoldMuted.copy(alpha = 0.5f), RoundedCornerShape(14.dp))
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            // 1. High-Resolution 2D Environmental Painting
-            Image(
-                painter = painterResource(id = bgDrawableRes),
-                contentDescription = locationTitle,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(14.dp))
-            )
+            // 1. High-Resolution 2D Environmental Painting (Assets or Drawable fallback)
+            if (customSceneBitmap != null) {
+                Image(
+                    bitmap = customSceneBitmap,
+                    contentDescription = locationTitle,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(14.dp))
+                )
+            } else {
+                Image(
+                    painter = painterResource(id = bgDrawableRes),
+                    contentDescription = locationTitle,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(14.dp))
+                )
+            }
 
             // 2. Cinematic Contrast Gradient Vignette
             Box(
