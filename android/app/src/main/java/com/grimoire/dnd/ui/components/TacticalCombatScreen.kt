@@ -111,7 +111,9 @@ fun TacticalCombatScreen(
                 Surface(
                     color = DarkSurface,
                     border = BorderStroke(1.dp, DarkBorder),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
                 ) {
                     Column(modifier = Modifier.padding(12.dp)) {
                         Text(

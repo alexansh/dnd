@@ -83,7 +83,9 @@ fun CharacterCreationScreen(
             Surface(
                 color = DarkSurface,
                 border = BorderStroke(1.dp, DarkBorder),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(

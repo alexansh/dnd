@@ -4,12 +4,22 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.grimoire.dnd.audio.SoundManager
 import com.grimoire.dnd.data.*
 import com.grimoire.dnd.engine.*
 import com.grimoire.dnd.ui.*
 import com.grimoire.dnd.ui.components.TacticalCombatScreen
+import com.grimoire.dnd.ui.theme.DarkBackground
 import com.grimoire.dnd.ui.theme.Grimoire5ETheme
 
 enum class AppNavState {
@@ -24,6 +34,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        hideSystemBars()
 
         val saveManager = LocalSaveManager(this)
         val diceEngine = DiceEngine()
@@ -38,7 +49,12 @@ class MainActivity : ComponentActivity() {
             }
 
             Grimoire5ETheme {
-                var navState by remember { mutableStateOf(AppNavState.HOME) }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(DarkBackground)
+                ) {
+                    var navState by remember { mutableStateOf(AppNavState.HOME) }
                 var selectedCampaign by remember { mutableStateOf(CampaignCatalog.campaigns.first()) }
                 var activeCharacter by remember { mutableStateOf<Character?>(null) }
                 var activeAdventureEngine by remember { mutableStateOf<AdventureEngine?>(null) }
@@ -193,5 +209,20 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+}
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (hasFocus) {
+            hideSystemBars()
+        }
+    }
+
+    private fun hideSystemBars() {
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        insetsController.systemBarsBehavior =
+            WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        insetsController.hide(WindowInsetsCompat.Type.systemBars())
     }
 }

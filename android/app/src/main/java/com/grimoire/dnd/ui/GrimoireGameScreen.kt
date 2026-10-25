@@ -256,7 +256,9 @@ fun GrimoireGameScreen(
             Surface(
                 color = DarkSurface,
                 border = BorderStroke(1.dp, DarkBorder),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
             ) {
                 Row(
                     modifier = Modifier
