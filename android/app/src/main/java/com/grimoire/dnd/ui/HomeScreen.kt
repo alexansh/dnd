@@ -1,7 +1,9 @@
 package com.grimoire.dnd.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -10,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -49,11 +52,13 @@ fun HomeScreen(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxWidth()
         ) {
-            Icon(
-                painter = painterResource(id = R.drawable.ic_dragon),
-                contentDescription = "Grimoire Crest",
-                tint = GoldAccent,
-                modifier = Modifier.size(64.dp)
+            Image(
+                painter = painterResource(id = R.drawable.app_logo),
+                contentDescription = "Grimoire 5E Logo",
+                modifier = Modifier
+                    .size(80.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .border(BorderStroke(2.dp, GoldAccent), RoundedCornerShape(18.dp))
             )
             Spacer(modifier = Modifier.height(14.dp))
             Text(
