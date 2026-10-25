@@ -220,6 +220,14 @@ fun LivingJournalModal(
                             Spacer(modifier = Modifier.height(10.dp))
                             Text("ACCESSIBILITY", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GoldAccent, letterSpacing = 1.sp)
                             Text("• High contrast font tokens enabled by default.\n• Compatible with Android TalkBack screen reader.\n• Colorblind-safe dice roll alerts.", fontSize = 12.sp, color = TextMuted, lineHeight = 18.sp)
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("LEGAL & SRD 5.1 ATTRIBUTION", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GoldAccent, letterSpacing = 1.sp)
+                            Text("Grimoire 5E utilizes the Systems Reference Document 5.1 (\"SRD 5.1\") licensed under the Creative Commons Attribution 4.0 International License (CC-BY-4.0) by Wizards of the Coast LLC. No non-SRD copyrighted content is included.", fontSize = 11.sp, color = TextMuted, lineHeight = 16.sp)
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text("PRIVACY & SECURITY PLEDGE", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = GoldAccent, letterSpacing = 1.sp)
+                            Text("100% offline-capable. All campaign states, canon ledgers, and transcripts remain strictly stored in local Room/SQLite databases on your device. Zero API keys ship in the APK.", fontSize = 11.sp, color = TextMuted, lineHeight = 16.sp)
                         }
                     }
                 }
